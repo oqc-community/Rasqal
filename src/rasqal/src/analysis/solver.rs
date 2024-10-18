@@ -1453,7 +1453,7 @@ impl ResultsSynthsizer {
 
     // Sort our entanglements by coupling strength.
     let mut entanglements = measure.entangled_with.iter().collect::<Vec<_>>();
-    entanglements.sort_by(|a, b| a.ratio.total_cmp(&b.ratio));
+    entanglements.sort_by(|a, b| b.ratio.total_cmp(&a.ratio));
 
     for ent_meta in entanglements.iter() {
       // Since we're sorted on this, soon as we see a non-one hundred value we know there
@@ -1571,7 +1571,7 @@ impl ResultsSynthsizer {
     }
 
     // Sort by probability since list shouldn't be large at this point, and it's what we'll want.
-    results.sort_by(|left, right| left.probability.total_cmp(&right.probability));
+    results.sort_by(|left, right| right.probability.total_cmp(&left.probability));
     results
   }
 }
