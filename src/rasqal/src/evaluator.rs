@@ -19,6 +19,7 @@ use inkwell::values::{
   InstructionValue
 };
 use inkwell::{FloatPredicate, IntPredicate};
+use lazy_static::lazy_static;
 use llvm_sys::core::{
   LLVMConstIntGetSExtValue, LLVMGetElementType, LLVMGetNumOperands, LLVMGetOperand,
   LLVMGetTypeKind, LLVMPrintTypeToString, LLVMPrintValueToString, LLVMTypeOf
@@ -33,7 +34,6 @@ use std::f64::consts::PI;
 use std::ffi::{c_uint, CStr};
 use std::ops::Deref;
 use std::time::Instant;
-use lazy_static::lazy_static;
 
 macro_rules! operand_to_value {
   ($target:ident, $index:expr) => {
@@ -94,7 +94,9 @@ pub fn parse_ref_id_from_instruction(inst: &InstructionValue) -> Option<String> 
 
 /// See [`get_ref_id_from_instruction`].
 pub fn parse_ref_id_from_instruction_str(inst_str: &str) -> Option<String> {
-  lazy_static! { static ref llvm_var_finder: Regex = Regex::new("([%@][^ ]*) =").unwrap(); }
+  lazy_static! {
+    static ref llvm_var_finder: Regex = Regex::new("([%@][^ ]*) =").unwrap();
+  }
   llvm_var_finder.captures(inst_str).map_or_else(
     || parse_ref_id_from_value(inst_str).or(None),
     |capture_groups| Some(capture_groups.get(1).unwrap().as_str().to_string())
@@ -107,13 +109,17 @@ pub fn parse_ref_id_from_instruction_str(inst_str: &str) -> Option<String> {
 /// Attempts to get a variable assignment from an argument value: some_call(%Array* %register, ...).
 pub fn parse_ref_id_from_value(ptr_string: &str) -> Option<String> {
   let ptr_string = ptr_string.trim_matches('"').trim();
-  lazy_static! { static ref local_variable_finder: Regex = Regex::new("^.*\\s(%[\\w0-9\\-]+)$").unwrap(); }
+  lazy_static! {
+    static ref local_variable_finder: Regex = Regex::new("^.*\\s(%[\\w0-9\\-]+)$").unwrap();
+  }
   let capture_groups = local_variable_finder.captures(ptr_string);
   let mut ref_id = capture_groups.map(|val| val.get(1).unwrap().as_str().to_string());
 
   // If we can't find a local variable, look globally.
   ref_id = ref_id.or_else(|| {
-    lazy_static! { static ref global_variable_finder: Regex = Regex::new("^.*\\s(@[\\w0-9\\-]+)$").unwrap(); }
+    lazy_static! {
+      static ref global_variable_finder: Regex = Regex::new("^.*\\s(@[\\w0-9\\-]+)$").unwrap();
+    }
     let capture_groups = global_variable_finder.captures(ptr_string);
     capture_groups.and_then(|val| {
       let val = val.get(1).unwrap().as_str().to_string();
@@ -127,7 +133,9 @@ pub fn parse_ref_id_from_value(ptr_string: &str) -> Option<String> {
 
   // Finally check if we're a global instruction target.
   ref_id.or_else(|| {
-    lazy_static! { static ref global_instruction_finder: Regex = Regex::new("^@[^\\s*]+(\\s|$)").unwrap(); }
+    lazy_static! {
+      static ref global_instruction_finder: Regex = Regex::new("^@[^\\s*]+(\\s|$)").unwrap();
+    }
     let capture_groups = global_instruction_finder.captures(ptr_string);
     capture_groups.and_then(|value| {
       let mut value = value.get(0).unwrap().as_str();
@@ -1603,7 +1611,9 @@ impl QIREvaluator {
               let inst_string = phi.to_string();
 
               // Do a dirty match to find the basic block names.
-              lazy_static! { static ref bb_finder: Regex = Regex::new(", %([^]]+?)]+").unwrap(); }
+              lazy_static! {
+                static ref bb_finder: Regex = Regex::new(", %([^]]+?)]+").unwrap();
+              }
               let capture_groups: Vec<String> = bb_finder
                 .captures_iter(inst_string.as_str())
                 .map(|val| val.get(1).unwrap().as_str().trim().to_string())
@@ -1818,7 +1828,9 @@ impl QIREvaluator {
     let mut index_values = Vec::new();
     for indexer in inst_str.split(',').rev() {
       let indexer = indexer.trim();
-      lazy_static! { static ref numeric_matcher: Regex = Regex::new("^[0-9]+$").unwrap(); }
+      lazy_static! {
+        static ref numeric_matcher: Regex = Regex::new("^[0-9]+$").unwrap();
+      }
       if numeric_matcher.is_match(indexer) {
         index_values.push(
           indexer
@@ -1865,7 +1877,9 @@ impl QIREvaluator {
     let mut index_values = Vec::new();
     for indexer in inst_str.split(',').rev() {
       let indexer = indexer.trim();
-      lazy_static! { static ref numeric_matcher: Regex = Regex::new("^[0-9]+$").unwrap(); }
+      lazy_static! {
+        static ref numeric_matcher: Regex = Regex::new("^[0-9]+$").unwrap();
+      }
       if numeric_matcher.is_match(indexer) {
         index_values.push(
           indexer
