@@ -1991,6 +1991,7 @@ impl QuantumSolver {
       }
     }
 
+    let start = Instant::now();
     let measurable_indexes = self
       .measures
       .keys()
@@ -2008,15 +2009,14 @@ impl QuantumSolver {
     }
 
     if self.is_tracing() {
-      log!(Level::Info, "Synthesis ready: {}\n", synth);
+      log!(Level::Info, "Unfiltered results: {}\n", synth);
     }
 
     let results = synth.synthesize();
-
     if self.is_tracing() {
       log!(
         Level::Info,
-        "Solved results:\n{}\n",
+        "Solver results:\n{}\n",
         results
           .iter()
           .map(|val| val.to_string())
@@ -2025,6 +2025,8 @@ impl QuantumSolver {
       );
     }
 
+    let took = start.elapsed();
+    log!(Level::Info, "Solving took {}ms", took.as_millis());
     results
   }
 
