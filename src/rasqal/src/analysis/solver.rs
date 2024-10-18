@@ -1704,6 +1704,12 @@ impl QuantumSolver {
     with_mutable!(qubit.state = Ptr::from(StateFragment::DefaultQubit()));
   }
 
+  pub fn measure_all(&self, qbs: &Vec<&Qubit>) {
+    for qb in qbs {
+      self.measure(qb);
+    }
+  }
+
   pub fn measure(&self, qb: &Qubit) {
     let mut tracing_message = None;
     if self.is_tracing() {
