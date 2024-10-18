@@ -285,6 +285,14 @@ impl QuantumProjection {
       }
     }
 
+    let took = start.elapsed();
+    let ms_duration = took.as_millis();
+    if ms_duration > 1000 {
+      log!(Level::Info, "Building solver took {}ms", ms_duration);
+    } else {
+      log!(Level::Info, "Building solver took {}s", took.as_secs());
+    }
+
     // For the projections, for now we only accept fully quantified results. Strip all
     // unknown values.
     let mut solver_results = Vec::new();
@@ -294,8 +302,6 @@ impl QuantumProjection {
       }
     }
 
-    let took = start.elapsed();
-    log!(Level::Info, "Solving took {}ms.", took.as_millis());
     AnalysisResult::from_solver_result(solver_results)
   }
 
