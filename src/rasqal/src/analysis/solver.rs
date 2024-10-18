@@ -1559,6 +1559,11 @@ impl ResultsSynthsizer {
           continue;
         }
 
+        // Break if we get to a point where this fragment will drop out of prediction range.
+        if fragment.rolling_probability * overlay_fragment.rolling_probability < lower_bound {
+          break;
+        }
+
         composite.overlay(overlay_fragment);
       }
 
