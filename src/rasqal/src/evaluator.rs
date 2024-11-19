@@ -602,13 +602,7 @@ impl QIREvaluator {
           Some(Value::Array(result))
         }
       }
-      AnyTypeEnum::VectorType(_) => {
-        unimplemented!()
-      }
-      AnyTypeEnum::VoidType(_) => {
-        unimplemented!()
-      }
-      AnyTypeEnum::FunctionType(_) => {
+      _ => {
         unimplemented!()
       }
     }
