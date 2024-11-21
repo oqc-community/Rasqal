@@ -40,8 +40,9 @@ task format-rust {
 
 task build-llvm -depends init {
     $env:LLVM_SYS_150_PREFIX = Resolve-InstallationDirectory
-    Invoke-LoggedCommand -workingDirectory $BuildLlvm { cargo test --release @(Get-CargoArgs) }
+    Invoke-LoggedCommand -workingDirectory $BuildLlvm { cargo update }
     Invoke-LoggedCommand -workingDirectory $BuildLlvm { cargo build --release @(Get-CargoArgs) }
+    Invoke-LoggedCommand -workingDirectory $BuildLlvm { cargo test --release @(Get-CargoArgs) }
 }
 
 task build-rasqal -depends init {
@@ -51,6 +52,7 @@ task build-rasqal -depends init {
 
     $env:MATURIN_PEP517_ARGS = (Get-CargoArgs) -Join " "
     Get-Wheels rasqal | Remove-Item -Verbose
+    Invoke-LoggedCommand -workingDirectory $Rasqal { cargo update }
     Invoke-LoggedCommand { pip --verbose wheel --no-deps --wheel-dir $Wheels $Rasqal }
 }
 
@@ -148,17 +150,12 @@ task init -depends check-environment {
         }
         else {
             Write-BuildLog "LLVM target is not installed."
-            if (Test-AllowedToDownloadLlvm) {
-                Write-BuildLog "Downloading LLVM target"
-                Invoke-Task "install-llvm-from-archive"
-            }
-            else {
-                Write-BuildLog "Downloading LLVM Disabled, building from source."
-                # We don't have an external LLVM installation specified
-                # We are not downloading LLVM
-                # So we need to build it.
-                Invoke-Task "install-llvm-from-source"
-            }
+			Write-BuildLog "Downloading LLVM Disabled, building from source."
+			# We don't have an external LLVM installation specified
+			# We are not downloading LLVM
+			# So we need to build it.
+			Invoke-Task "install-llvm-from-source"
+		
             $installationDirectory = Resolve-InstallationDirectory
             Use-LlvmInstallation $installationDirectory
         }
