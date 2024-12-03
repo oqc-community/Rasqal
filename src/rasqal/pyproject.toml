@@ -22,7 +22,7 @@ authors = [
 ]
 
 dependencies = [
-    "qiskit>=1.2.*",
+    "qiskit==1.2.*",
     "qiskit-optimization>=0.6.1",
     "qiskit-aer>=0.15.1",
     "pytket>=1.31.0"
