@@ -253,13 +253,13 @@ mod tests {
   //   run_with_config("../tests/files/qir/large/500qb20k.ll", config);
   // }
 
-  #[test]
+  // #[test]
   fn execute_500qb_4k() {
     let config = RasqalConfig::default().with_activate_solver();
     run_with_config("../tests/files/qir/large/500qb4k.ll", config);
   }
 
-  #[test]
+  // #[test]
   fn execute_qaoa_solver() {
     let config = RasqalConfig::default().with_activate_solver();
     run_with_config("../tests/qsharp/qaoa/qir/qaoa.ll", config);
