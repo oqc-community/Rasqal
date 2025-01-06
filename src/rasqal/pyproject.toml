@@ -1,6 +1,6 @@
 [project]
 name = "rasqal"
-version = "0.1.7"
+version = "0.2.0"
 requires-python = ">=3.10"
 description = "A hybrid quantum-classical analysis/solving runtime."
 license = { file = "LICENSE" }

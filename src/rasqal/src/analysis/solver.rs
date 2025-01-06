@@ -82,7 +82,7 @@ impl Tangle {
   }
 }
 
-/// Solved entanglement metadata between qubits. Holds teh ratio of entanglement and with what
+/// Solved entanglement metadata between qubits. Holds the ratio of entanglement and with what
 /// qubit, optionally if the resultant entanglement is inferred by another entanglement.
 ///
 /// This means if you have Q0~Q1~Q2 any entanglement information for Q0 about Q2 will be via Q1.
@@ -1296,7 +1296,7 @@ pub struct ResultFragment {
 
   /// Max number of qubits that are actually measured. Indexes do not need to be sequential, so
   /// you can measure qubits 5, 75, 240 and 700 and this will simply be 4. Used to pad out
-  /// unknowable  values if a qubit is early in the analysis chain.
+  /// unknowable values if a qubit is early in the analysis chain.
   measureable_qubits: Ptr<HashSet<i64>>
 }
 
@@ -1457,7 +1457,7 @@ impl ResultsSynthsizer {
 
     for ent_meta in entanglements.iter() {
       // Since we're sorted on this, soon as we see a non-one hundred value we know there
-      // will be no others. Ratio is 0-100.
+      // will be no others. Ratio is 0.0 to 1.0.
       if !is_near!(ent_meta.ratio, 1.0) {
         break;
       }
@@ -1466,7 +1466,6 @@ impl ResultsSynthsizer {
       removals.insert(ent_meta.qubit);
     }
 
-    let number_of_entanglements = entanglements.len();
     let mut results = Vec::new();
     results.push(ResultFragment::with_flipped(&starter));
     results.push(starter);

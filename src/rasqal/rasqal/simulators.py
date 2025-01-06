@@ -1,10 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2024 Oxford Quantum Circuits Ltd
+from copy import copy
 
 from typing import Dict
 
 from qiskit import QiskitError, QuantumCircuit, transpile
-from qiskit_aer import AerSimulator
+from qiskit_aer.backends import AerSimulator
+from qiskit_aer.backends.backendconfiguration import AerBackendConfiguration
 
 from .runtime import RasqalRunner
 from .adaptors import BuilderAdaptor, RuntimeAdaptor
@@ -69,7 +71,9 @@ class QASMRuntime(RuntimeAdaptor):
         self.qubit_count = qubit_count
 
     def execute(self, builder: QASMBuilder) -> Dict[str, int]:
-        qasm_sim = AerSimulator()
+        config = copy(AerSimulator._DEFAULT_CONFIGURATION)
+        config["n_qubits"] = self.qubit_count
+        qasm_sim = AerSimulator(configuration=AerBackendConfiguration.from_dict(config))
 
         circuit = builder.circuit
         try:
