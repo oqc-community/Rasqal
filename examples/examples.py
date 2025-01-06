@@ -23,7 +23,7 @@ def fetch_runner(qubit_count, tracing_runner=False):
     precisely what's going on. It's only used for visualization though, so will be a little slower.
     """
     if tracing_runner:
-        return RasqalRunner(TracingRuntime(qubit_count=qubit_count))
+        return RasqalRunner(TracingRuntime(qubit_count))
     else:
         return fetch_qasm_runner(qubit_count)
 
@@ -193,7 +193,7 @@ def qaoa():
     to evolve them.
     """
     print("Running qaoa.")
-    runner = fetch_runner(20)
+    runner = fetch_runner(30)
     runner.run_ll(read_qir_file("qaoa.ll"))
 
 

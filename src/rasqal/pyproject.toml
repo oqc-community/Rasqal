@@ -1,6 +1,6 @@
 [project]
 name = "rasqal"
-version = "0.1.7"
+version = "0.2.0"
 requires-python = ">=3.10"
 description = "A hybrid quantum-classical analysis/solving runtime."
 license = { file = "LICENSE" }
@@ -22,10 +22,9 @@ authors = [
 ]
 
 dependencies = [
-    "qiskit==0.45.*,<1.0.0",
-    "qiskit-optimization>=0.4.0",
-    "qiskit-ignis>=0.7.0",
-    "qiskit-aer>=0.13.0",
+    "qiskit==1.2.*",
+    "qiskit-optimization>=0.6.1",
+    "qiskit-aer>=0.15.1",
     "pytket>=1.31.0"
 ]
 

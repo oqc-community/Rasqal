@@ -34,7 +34,7 @@ macro_rules! C {
   };
 }
 
-/// Nn is-near check up to 4 dp. In a perfect world if the boundaries are constants it should
+/// An is-near check up to 4 dp. In a perfect world if the boundaries are constants it should
 /// compile away the operations.
 macro_rules! is_near {
   ($numb:expr, $bound:expr) => {
@@ -82,7 +82,7 @@ impl Tangle {
   }
 }
 
-/// Solved entanglement metadata between qubits. Holds teh ratio of entanglement and with what
+/// Solved entanglement metadata between qubits. Holds the ratio of entanglement and with what
 /// qubit, optionally if the resultant entanglement is inferred by another entanglement.
 ///
 /// This means if you have Q0~Q1~Q2 any entanglement information for Q0 about Q2 will be via Q1.
@@ -206,15 +206,13 @@ impl AnalysisQubit {
 
   pub fn is_entangled(&self) -> bool { !self.tangles.is_empty() }
 
-  // TODO: Remove self_pointer and decide how to deal with this. Don't want to steal the
-  //  borrow really.
-  pub fn entangle(&self, self_pointer: &Ptr<AnalysisQubit>, other: &Ptr<AnalysisQubit>) {
+  pub fn entangle(&self, other: &Ptr<AnalysisQubit>) {
     if self.is_entangled_with(&other.index) {
       return;
     }
 
-    let tangle = Ptr::from(Tangle::from_qubits(self_pointer, other));
-    with_mutable!(self_pointer.tangles.insert(other.index, tangle.clone()));
+    let tangle = Ptr::from(Tangle::from_qubits(&Ptr::from(self), other));
+    with_mutable_self!(self.tangles.insert(other.index, tangle.clone()));
     with_mutable!(other.tangles.insert(self.index, tangle));
   }
 
@@ -257,7 +255,7 @@ impl AnalysisQubit {
           results.push(EntanglementMetadata::with_via(
             *key,
             current_qubit.clone(),
-            (max / entangled) * 100.
+            max / entangled
           ));
           recurse_chains(
             key,
@@ -349,14 +347,14 @@ impl AnalysisQubit {
       &gate.tensor(&MatrixFragment::id())
     };
 
-    let inverted_gate = gate.invert();
+    let inverted_gate = expanded_gate.invert();
     let mut unentangled = Vec::new();
     for tangle in self.tangles.values() {
       // If our actual target is inverted, invert the matrix too.
       let applied_gate = if tangle.right.index == self.index {
         &inverted_gate
       } else {
-        gate
+        expanded_gate
       };
 
       let mut before = None;
@@ -560,7 +558,7 @@ impl EntanglementCluster {
   pub fn entangle(&self, left: &i64, right: &i64) {
     if let Some(rqubit) = self.qubits.get(right) {
       if let Some(lqubit) = self.qubits.get(left) {
-        rqubit.entangle(rqubit, lqubit);
+        rqubit.entangle(lqubit);
       }
     }
   }
@@ -1084,7 +1082,7 @@ impl MatrixFragment {
 
       result.push(format!(
         "[{}, {}, {}, {}]",
-        first_row.get(0).unwrap(),
+        first_row.get(3).unwrap(),
         second_row.get(3).unwrap(),
         third_row.get(3).unwrap(),
         fourth_row.get(3).unwrap()
@@ -1282,7 +1280,11 @@ impl SolverResult {
 
 impl Display for SolverResult {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    f.write_str(&format!("{} @ {:.2}%", self.bitstring, self.probability))
+    f.write_str(&format!(
+      "{} @ {:.2}%",
+      self.bitstring,
+      self.probability * 100.
+    ))
   }
 }
 
@@ -1290,14 +1292,22 @@ impl Display for SolverResult {
 pub struct ResultFragment {
   /// Rolling probability of this whole fragment being applicable. Used for filtering.
   rolling_probability: f64,
-  fragment: HashMap<i64, i16>
+  fragment: HashMap<i64, i16>,
+
+  /// Max number of qubits that are actually measured. Indexes do not need to be sequential, so
+  /// you can measure qubits 5, 75, 240 and 700 and this will simply be 4. Used to pad out
+  /// unknowable values if a qubit is early in the analysis chain.
+  measureable_qubits: Ptr<HashSet<i64>>
 }
 
 impl ResultFragment {
-  pub fn new(index: i64, result: i16, probability: f64) -> ResultFragment {
+  pub fn new(
+    index: i64, result: i16, probability: f64, measureable_qubits: Ptr<HashSet<i64>>
+  ) -> ResultFragment {
     let mut fragment = ResultFragment {
       fragment: HashMap::default(),
-      rolling_probability: probability
+      rolling_probability: probability,
+      measureable_qubits
     };
     fragment.fragment.insert(index, result);
     fragment
@@ -1314,8 +1324,9 @@ impl ResultFragment {
     }
 
     ResultFragment {
-      rolling_probability: 100.0 - result.rolling_probability,
-      fragment: flipped_fragments
+      rolling_probability: 1.0 - result.rolling_probability,
+      fragment: flipped_fragments,
+      measureable_qubits: result.measureable_qubits.clone()
     }
   }
 
@@ -1356,25 +1367,30 @@ impl ResultFragment {
     self.rolling_probability = self.rolling_probability * other.rolling_probability
   }
 
-  /// Generates a human-readable bitstring from this fragment. Replaces all unknown bits with X.
-  pub fn as_bitstring(&self) -> String {
-    if let Some(max_value) = self.fragment.keys().max() {
-      let mut result = String::new();
-      for i in 0..=*max_value {
-        if let Some(value) = self.fragment.get(&i) {
-          result.push_str(&value.to_string())
-        } else {
-          result.push('X')
-        }
+  /// Fills out all unmeasured qubits in the bitstring with zeros, up to `register_count`.
+  pub fn fill_empty(&mut self, register_count: i64) {
+    for i in 0..=register_count {
+      if !self.measureable_qubits.contains(&i) {
+        self.fragment.insert(i, 0);
       }
-      result
-    } else {
-      String::new()
     }
   }
 
+  /// Generates a human-readable bitstring from this fragment. Replaces all unknown bits with X.
+  pub fn as_bitstring(&self) -> String {
+    let mut result = String::new();
+    for i in self.measureable_qubits.iter() {
+      if let Some(value) = self.fragment.get(&i) {
+        result.push_str(&value.to_string())
+      } else {
+        result.push('X')
+      }
+    }
+    result
+  }
+
   /// Is this fragment actually fully resolved with results in every slot?
-  pub fn is_solved(&self, register_size: usize) -> bool { self.fragment.len() >= register_size }
+  pub fn is_solved(&self) -> bool { self.fragment.len() >= self.measureable_qubits.len() }
 }
 
 impl Display for ResultFragment {
@@ -1382,7 +1398,7 @@ impl Display for ResultFragment {
     f.write_str(&format!(
       "{} @ {:.2}%",
       self.as_bitstring(),
-      self.rolling_probability
+      self.rolling_probability * 100.
     ))
   }
 }
@@ -1397,22 +1413,38 @@ pub struct ResultsSynthsizer {
   /// probability the max amount we should add in total. The dropped ones will be the last
   /// added, which will be the longest result chains.
   max_entangles_per_add: usize,
-  fragments: Vec<ResultFragment>
+  fragments: Vec<ResultFragment>,
+
+  /// Set of measured qubit indexes so we know which indexes are used, or not, and to default all
+  /// unmeasured to zero after we've synthesized a result.
+  measured_qubits: Ptr<HashSet<i64>>,
+
+  register_size: i64
 }
 
 impl ResultsSynthsizer {
-  pub fn new(probability_range: f64, max_entangles_per_add: usize) -> ResultsSynthsizer {
+  pub fn new(
+    probability_range: f64, max_entangles_per_add: usize, measured_qubits: HashSet<i64>,
+    register_size: i64
+  ) -> ResultsSynthsizer {
     ResultsSynthsizer {
       probability_range,
       max_entangles_per_add,
-      fragments: Vec::default()
+      fragments: Vec::default(),
+      measured_qubits: Ptr::from(measured_qubits),
+      register_size
     }
   }
 
   pub fn add(&mut self, measure: &MeasureAnalysis) {
     // Build starter fragment with just our qubit.
     let qubit_result = 1;
-    let mut starter = ResultFragment::new(measure.qubit, qubit_result, measure.probability);
+    let mut starter = ResultFragment::new(
+      measure.qubit,
+      qubit_result,
+      measure.probability,
+      self.measured_qubits.clone()
+    );
 
     // Any full entanglement gets appended to the default fragment as there is no chance they
     // will deviate. This can drastically reduce complexity depending upon how reliant the
@@ -1421,12 +1453,12 @@ impl ResultsSynthsizer {
 
     // Sort our entanglements by coupling strength.
     let mut entanglements = measure.entangled_with.iter().collect::<Vec<_>>();
-    entanglements.sort_by(|a, b| a.ratio.total_cmp(&b.ratio));
+    entanglements.sort_by(|a, b| b.ratio.total_cmp(&a.ratio));
 
     for ent_meta in entanglements.iter() {
       // Since we're sorted on this, soon as we see a non-one hundred value we know there
-      // will be no others. Ratio is 0-100.
-      if !is_near!(ent_meta.ratio, 100.0) {
+      // will be no others. Ratio is 0.0 to 1.0.
+      if !is_near!(ent_meta.ratio, 1.0) {
         break;
       }
 
@@ -1526,18 +1558,24 @@ impl ResultsSynthsizer {
           continue;
         }
 
+        // Break if we get to a point where this fragment will drop out of prediction range.
+        if fragment.rolling_probability * overlay_fragment.rolling_probability < lower_bound {
+          break;
+        }
+
         composite.overlay(overlay_fragment);
       }
 
       let composite_key = composite.to_string();
       if composite.rolling_probability >= lower_bound && !duplicated.contains(&composite_key) {
+        composite.fill_empty(self.register_size);
         results.push(SolverResult::from_result_fragment(&composite));
         duplicated.insert(composite_key);
       }
     }
 
     // Sort by probability since list shouldn't be large at this point, and it's what we'll want.
-    results.sort_by(|left, right| left.probability.total_cmp(&right.probability));
+    results.sort_by(|left, right| right.probability.total_cmp(&left.probability));
     results
   }
 }
@@ -1665,6 +1703,12 @@ impl QuantumSolver {
     with_mutable!(qubit.state = Ptr::from(StateFragment::DefaultQubit()));
   }
 
+  pub fn measure_all(&self, qbs: &Vec<&Qubit>) {
+    for qb in qbs {
+      self.measure(qb);
+    }
+  }
+
   pub fn measure(&self, qb: &Qubit) {
     let mut tracing_message = None;
     if self.is_tracing() {
@@ -1778,6 +1822,12 @@ impl QuantumSolver {
     );
 
     for qb in controls {
+      // If a single iteration drops entanglement we need to re-add the qubit for analysis.
+      // TODO: Rethink.
+      if !target_cluster.contains(&target.index) {
+        target_cluster.add(self.qubit_for(&target.index));
+      }
+
       target_cluster.CX(&qb.index, &target.index, radians);
     }
 
@@ -1811,6 +1861,12 @@ impl QuantumSolver {
     );
 
     for qb in controls {
+      // If a single iteration drops entanglement we need to re-add the qubit for analysis.
+      // TODO: Rethink.
+      if !target_cluster.contains(&target.index) {
+        target_cluster.add(self.qubit_for(&target.index));
+      }
+
       target_cluster.CY(&qb.index, &target.index, radians);
     }
 
@@ -1844,7 +1900,13 @@ impl QuantumSolver {
     );
 
     for qb in controls {
-      target_cluster.CY(&qb.index, &target.index, radians);
+      // If a single iteration drops entanglement we need to re-add the qubit for analysis.
+      // TODO: Rethink.
+      if !target_cluster.contains(&target.index) {
+        target_cluster.add(self.qubit_for(&target.index));
+      }
+
+      target_cluster.CZ(&qb.index, &target.index, radians);
     }
 
     if self.is_tracing() {
@@ -1934,21 +1996,32 @@ impl QuantumSolver {
       }
     }
 
-    let mut synth = ResultsSynthsizer::new(self.probability_range, self.max_entanglements);
+    let start = Instant::now();
+    let measurable_indexes = self
+      .measures
+      .keys()
+      .map(|val| val.clone())
+      .collect::<HashSet<i64>>();
+
+    let mut synth = ResultsSynthsizer::new(
+      self.probability_range,
+      self.max_entanglements,
+      measurable_indexes,
+      *self.qubits.keys().max().unwrap()
+    );
     for meas in self.measures.values() {
       synth.add(meas);
     }
 
     if self.is_tracing() {
-      log!(Level::Info, "Synthesis ready: {}\n", synth);
+      log!(Level::Info, "Unfiltered results: {}\n", synth);
     }
 
     let results = synth.synthesize();
-
     if self.is_tracing() {
       log!(
         Level::Info,
-        "Solved results:\n{}\n",
+        "Solver results:\n{}\n",
         results
           .iter()
           .map(|val| val.to_string())
@@ -1957,6 +2030,8 @@ impl QuantumSolver {
       );
     }
 
+    let took = start.elapsed();
+    log!(Level::Info, "Solving took {}ms", took.as_millis());
     results
   }
 
@@ -1968,7 +2043,7 @@ impl QuantumSolver {
     let mut post = self.qubit_for(&pre.qubit).measure();
     let mut differences = Vec::new();
     if pre.probability != post.probability {
-      differences.push(format!("from {:.2}%", pre.probability))
+      differences.push(format!("from {:.2}%", pre.probability * 100.))
     }
 
     let preq = pre
@@ -2068,7 +2143,7 @@ mod tests {
 
   #[test]
   fn bell_test() {
-    let solver = QuantumSolver::with_trace(Ptr::from(TracingModule::with(ActiveTracers::all())));
+    let solver = QuantumSolver::new();
     let (q0, q1) = (Qubit::new(0), Qubit::new(1));
     solver.Had(&q0);
     solver.CX(&vec![q1.clone()], &q0, &PI);
@@ -2081,8 +2156,8 @@ mod tests {
       .filter(|val| val.bitstring == "11" || val.bitstring == "00")
       .collect::<Vec<_>>();
     assert_eq!(results.len(), 2);
-    assert!(results[0].probability >= 49.9 && results[0].probability <= 50.1);
-    assert!(results[1].probability >= 49.9 && results[1].probability <= 50.1);
+    assert!(results[0].probability >= 0.49 && results[0].probability <= 0.51);
+    assert!(results[1].probability >= 0.49 && results[1].probability <= 0.51);
   }
 
   #[test]

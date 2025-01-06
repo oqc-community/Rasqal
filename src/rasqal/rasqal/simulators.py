@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: BSD-3-Clause
 # Copyright (c) 2024 Oxford Quantum Circuits Ltd
+from copy import copy
 
 from typing import Dict
 
-from qiskit.providers.models import QasmBackendConfiguration
-
 from qiskit import QiskitError, QuantumCircuit, transpile
-from qiskit_aer import AerSimulator
+from qiskit_aer.backends import AerSimulator
+from qiskit_aer.backends.backendconfiguration import AerBackendConfiguration
 
 from .runtime import RasqalRunner
 from .adaptors import BuilderAdaptor, RuntimeAdaptor
@@ -71,14 +71,11 @@ class QASMRuntime(RuntimeAdaptor):
         self.qubit_count = qubit_count
 
     def execute(self, builder: QASMBuilder) -> Dict[str, int]:
-        aer_config = QasmBackendConfiguration.from_dict(
-            AerSimulator._DEFAULT_CONFIGURATION
-        )
-        aer_config.n_qubits = builder.circuit.num_qubits
-        qasm_sim = AerSimulator(aer_config)
+        config = copy(AerSimulator._DEFAULT_CONFIGURATION)
+        config["n_qubits"] = self.qubit_count
+        qasm_sim = AerSimulator(configuration=AerBackendConfiguration.from_dict(config))
 
         circuit = builder.circuit
-        # TODO: Needs a more nuanced try/catch. Some exceptions we should catch, others we should re-throw.
         try:
             job = qasm_sim.run(transpile(circuit, qasm_sim), shots=builder.shot_count)
             results = job.result()

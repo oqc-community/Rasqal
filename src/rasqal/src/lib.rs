@@ -18,11 +18,11 @@
 extern crate core;
 
 use log::{log, log_enabled, Level, LevelFilter};
+use std::env;
 use std::env::current_exe;
 use std::fs;
 use std::fs::File;
 use std::path::Path;
-use std::env;
 
 mod analysis;
 mod builders;
